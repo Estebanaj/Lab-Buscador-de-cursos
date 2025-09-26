@@ -207,3 +207,130 @@ WHERE i.palabra IN (SELECT term FROM Q)
 GROUP BY c.url
 ORDER BY score_bin DESC, c.url
 LIMIT 10;
+```
+
+## 8️ Paso a paso para ejecutar el proyecto
+
+Esta guía describe cómo **correr todo el flujo** del taller desde cero:  
+crawler → generación de índices → carga en PostgreSQL → consultas SQL.
+
+---
+
+### 🔹 1. Clonar o abrir el proyecto
+
+Asegúrate de tener los archivos en una carpeta de trabajo (ejemplo: `Analitica de datos/`):
+
+## 📂 Estructura del proyecto
+
+```text
+Analitica de datos/
+├── crawler.py
+├── run_crawler.py
+├── util.py
+├── search.py
+├── compare.py
+├── stopwords_es.txt
+├── sql/
+│   └── schema.sql
+```
+### 🔹 3. Instalar dependencias
+
+Ejecuta en la terminal:
+
+```bash
+pip install requests beautifulsoup4 html5lib psycopg2-binary
+```
+
+### 🔹 4. Ejecutar el crawler
+
+Corre el script lanzador para recorrer **N páginas** (ejemplo: 200):
+
+```bash
+python run_crawler.py
+[OK] Páginas visitadas: 200
+[OK] Cursos mapeados : 150
+[OK] Palabras índice : 1200
+Listo: se generaron index.csv y courses.json
+```
+### 🔹 5. Generar `courses.csv`
+
+Convierte `courses.json` a CSV para PostgreSQL ejecutando:
+
+```bash
+python make_courses_csv.py
+
+curso_id,url
+curso-1,https://educacionvirtual.javeriana.edu.co/curso-1
+curso-2,https://educacionvirtual.javeriana.edu.co/curso-2
+```
+
+### 🔹 6. Crear base de datos en PostgreSQL
+
+Accede a PostgreSQL:
+
+```bash
+psql -U postgres
+CREATE DATABASE uj_searchlab;
+\c uj_searchlab
+\i sql/schema.sql
+CREATE TABLE courses (
+  curso_id TEXT PRIMARY KEY,
+  url TEXT
+);
+
+CREATE TABLE idx (
+  curso_id TEXT,
+  palabra TEXT
+);
+```
+
+### 🔹 7. Cargar los datos
+
+Dentro de `psql -d uj_searchlab` ejecuta:
+
+```sql
+TRUNCATE idx;
+\copy idx (curso_id, palabra) FROM 'index.csv' WITH (FORMAT csv, DELIMITER '|');
+
+TRUNCATE courses;
+\copy courses (curso_id, url) FROM 'courses.csv' WITH (FORMAT csv, HEADER true);
+
+SELECT COUNT(*) FROM courses;
+SELECT COUNT(*) FROM idx;
+
+```
+### 🔹 8. Ejecutar consultas SQL
+
+#### 📌 Ejemplos rápidos
+
+**Buscar cursos con la palabra "gestion":**
+
+```sql
+SELECT DISTINCT c.url
+FROM idx i JOIN courses c ON c.curso_id = i.curso_id
+WHERE i.palabra = 'gestion'
+LIMIT 10;
+
+SELECT c.url
+FROM idx i JOIN courses c ON c.curso_id = i.curso_id
+WHERE i.palabra IN ('inteligencia','artificial')
+GROUP BY c.url
+HAVING COUNT(DISTINCT i.palabra) = 2;
+```
+
+### 🔹 9. Usar funciones de búsqueda y comparación en Python
+
+Ejecuta en Python:
+
+```python
+from search import search, search_binary
+from compare import compare
+
+# Buscar cursos (IDF)
+print(search(["inteligencia", "artificial"])[:5])
+
+# Buscar cursos (binaria)
+print(search_binary(["gestion", "salud"])[:5])
+
+# Comparar cursos por similitud Jaccard
+```
