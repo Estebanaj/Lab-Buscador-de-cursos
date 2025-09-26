@@ -209,7 +209,7 @@ ORDER BY score_bin DESC, c.url
 LIMIT 10;
 ```
 
-## 8️ Paso a paso para ejecutar el proyecto
+## 7 Paso a paso para ejecutar el proyecto
 
 Esta guía describe cómo **correr todo el flujo** del taller desde cero:  
 crawler → generación de índices → carga en PostgreSQL → consultas SQL.
