@@ -334,3 +334,23 @@ print(search_binary(["gestion", "salud"])[:5])
 
 # Comparar cursos por similitud Jaccard
 ```
+## 9️ Conclusión general
+
+Este taller permitió construir de principio a fin un **mini motor de búsqueda** aplicado al catálogo de cursos de Educación Virtual de la Universidad Javeriana.  
+A través de la implementación práctica se alcanzaron los siguientes logros:
+
+- **Crawler BFS**: se desarrolló un rastreador basado en cola FIFO capaz de recorrer páginas del dominio `educacionvirtual.javeriana.edu.co`, evitando duplicados y manejando redirecciones de forma controlada.  
+- **Índice invertido**: se construyó un índice palabra → cursos (`index.csv`) que sirve como base para realizar consultas eficientes y aplicar métricas de comparación.  
+- **Stopwords y normalización**: se evidenció la importancia de limpiar los datos para mejorar la calidad del vocabulario y evitar ruido con palabras vacías o muy comunes.  
+- **Persistencia en PostgreSQL**: la información recolectada se almacenó en tablas relacionales (`courses`, `idx`), lo que habilitó el uso de SQL para ejecutar búsquedas, estadísticas y métricas de evaluación.  
+- **Búsqueda**: se implementaron dos enfoques:
+  - **Binario** (conteo de coincidencias), como baseline simple.
+  - **IDF ponderado**, que mejora la relevancia dando más peso a términos raros y específicos.  
+- **Comparación curso–curso**: mediante la métrica de **Jaccard**, se midió la similitud de vocabulario entre cursos, permitiendo identificar contenidos cercanos o redundantes.  
+- **Medición de algoritmos**: se aplicaron indicadores como precisión en búsqueda (P@k), cobertura del crawler (páginas y cursos recolectados) y análisis de distribución del vocabulario, validando así la efectividad de las técnicas aplicadas.  
+
+### 📊 Conclusión
+El taller mostró cómo combinar técnicas de **web crawling, procesamiento de texto, estructuras de datos, bases de datos y métricas de similitud** para resolver un problema práctico de recuperación de información.  
+Aunque las soluciones implementadas son sencillas (búsqueda binaria, IDF, Jaccard), permiten comprender los fundamentos de motores de búsqueda más complejos y evidencian el impacto de cada decisión (uso de stopwords, ponderación de términos, política de recorrido).
+
+Este ejercicio deja como enseñanza que incluso con herramientas básicas es posible **transformar datos no estructurados en conocimiento consultable**, y abre camino a mejoras futuras como usar **lemmatización, TF-IDF completo, embeddings semánticos o interfaces web interactivas**.
