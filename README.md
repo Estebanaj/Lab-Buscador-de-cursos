@@ -31,9 +31,9 @@ Cada curso se representa como un **conjunto de tokens** de su título y descripc
 La comparación se realiza entre estos conjuntos.
 
 ### 🔹 Similitud de Jaccard
-\[
-\text{Jaccard}(A,B) = \frac{|A \cap B|}{|A \cup B|}
-\]
+$$
+Jaccard(A, B) = \frac{|A \cap B|}{|A \cup B|}
+$$
 
 - 0 = cursos completamente distintos.  
 - 1 = cursos idénticos.  
