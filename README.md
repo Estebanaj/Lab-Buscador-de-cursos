@@ -5,7 +5,7 @@ Incluye un **crawler BFS**, un **índice invertido** y la persistencia en **Post
 
 ---
 
-## 1️⃣ Descripción del taller
+## 1️ Descripción del taller
 
 El objetivo es construir un mini motor de búsqueda capaz de:
 
@@ -25,7 +25,7 @@ El objetivo es construir un mini motor de búsqueda capaz de:
 
 ---
 
-## 2️⃣ Métricas de comparación entre cursos
+## 2️ Métricas de comparación entre cursos
 
 Cada curso se representa como un **conjunto de tokens** de su título y descripción.  
 La comparación se realiza entre estos conjuntos.
@@ -60,7 +60,7 @@ IDF(t) = \log \frac{N}{df(t)}
 
 ---
 
-## 3️⃣ Comparación curso–curso (ejemplo práctico)
+## 3️ Comparación curso–curso (ejemplo práctico)
 
 ### Ejemplo 1: dos cursos
 - Curso A: *Gestión de Proyectos en Salud Virtual* → `{gestion, proyectos, salud, virtual}`  
@@ -85,4 +85,125 @@ WHERE i1.curso_id = 'cursoA' AND i2.curso_id <> 'cursoA'
 GROUP BY c2.curso_id, c2.url
 ORDER BY jaccard DESC
 LIMIT 5;
+```
+## 4️ Medición de los algoritmos
 
+Esta sección describe **qué medir**, **cómo medirlo** y con **qué consultas SQL** evaluar el rendimiento de cada parte del taller.
+
+---
+
+### 4.1 Crawler: cobertura y desempeño
+
+**Qué medir (KPIs):**
+- Páginas visitadas (`pages_visited`)  
+- Cursos mapeados (`courses`)  
+- Palabras en el índice (`idx`)  
+- Tokens por curso (media, min, max)  
+- Tiempo total de ejecución  
+
+**Consultas en PostgreSQL:**
+```sql
+-- Total cursos y total pares (curso, palabra)
+SELECT COUNT(*) AS cursos FROM courses;
+SELECT COUNT(*) AS pares  FROM idx;
+
+-- Tamaño de vocabulario (palabras únicas)
+SELECT COUNT(DISTINCT palabra) AS vocab FROM idx;
+
+-- Distribución de tokens por curso
+SELECT AVG(cnt)::numeric(10,2) AS avg_tokens,
+       MIN(cnt) AS min_tokens,
+       MAX(cnt) AS max_tokens
+FROM (
+  SELECT curso_id, COUNT(DISTINCT palabra) AS cnt
+  FROM idx
+  GROUP BY curso_id
+) t;
+```
+## 5️ Índice y stopwords: calidad de términos
+
+El **índice invertido** es la tabla `idx(curso_id, palabra)` generada por el crawler a partir de **títulos + descripciones**.  
+Para asegurar calidad, limpiamos tokens a **minúsculas**, quitamos **puntuación** y filtramos **stopwords** (archivo `stopwords_es.txt`).
+
+**Checklist para una buena calidad del índice**
+- [x] `stopwords_es.txt` incluye conectores comunes: _de, la, el, en, para, con, por, del, los, las…_  
+- [x] `tokenize()` aplica stopwords **antes** de escribir en `index.csv`.  
+- [x] (Opcional) normalizar tildes: `gestión → gestion`, `inteligencia → inteligencia`.  
+- [x] Re-ejecutar el pipeline tras cambios en stopwords:
+  1) `python run_crawler.py`  
+  2) regenerar `courses.csv`  
+  3) recargar `idx` y `courses` en PostgreSQL
+
+**Consultas de diagnóstico**
+```sql
+-- Top 20 palabras más frecuentes (detecta si aún quedaron stopwords)
+SELECT palabra, COUNT(*) AS freq
+FROM idx
+GROUP BY palabra
+ORDER BY freq DESC
+LIMIT 20;
+
+-- Tamaño del vocabulario (palabras únicas)
+SELECT COUNT(DISTINCT palabra) AS vocab FROM idx;
+
+-- Distribución de tokens por curso (calidad de cobertura)
+SELECT AVG(cnt)::numeric(10,2) AS avg_tokens,
+       MIN(cnt) AS min_tokens,
+       MAX(cnt) AS max_tokens
+FROM (
+  SELECT curso_id, COUNT(DISTINCT palabra) AS cnt
+  FROM idx
+  GROUP BY curso_id
+) t;
+
+-- IDF aproximado (palabras raras pesan más)
+WITH
+N AS (SELECT COUNT(*)::float AS n FROM courses),
+DF AS (
+  SELECT palabra, COUNT(DISTINCT curso_id) AS df
+  FROM idx GROUP BY palabra
+)
+SELECT d.palabra,
+       d.df,
+       ROUND(LN(n.n / d.df)::numeric, 4) AS idf
+FROM DF d, N n
+ORDER BY idf DESC
+LIMIT 20;
+```
+
+## 6 Búsqueda **binaria** (conteo de coincidencias)
+
+La búsqueda **binaria** puntúa cada curso solo por **cuántas** palabras de la consulta contiene (sin pesos).  
+Es una base simple para comparar contra la versión ponderada por IDF.
+
+### 📏 Definición
+
+Sea:
+- \( Q \) = conjunto de términos de la consulta (ya normalizados y sin stopwords)
+- \( V_c \) = conjunto de términos indexados del curso \( c \)
+
+El **score binario** es:
+\[
+\text{score}_\text{bin}(c, Q) \;=\; |\,Q \cap V_c\,|
+\]
+
+- Más alto = más coincidencias con la consulta.
+- Empates se rompen por `curso_id` o por reglas adicionales (p. ej., longitud del curso).
+
+---
+
+### 🧪 SQL – Ranking binario (ejemplo con “inteligencia artificial”)
+
+```sql
+WITH Q(term) AS (
+  VALUES ('inteligencia'), ('artificial')  -- <-- normaliza aquí tus términos
+)
+SELECT
+  c.url,
+  COUNT(DISTINCT i.palabra) AS score_bin
+FROM idx i
+JOIN courses c ON c.curso_id = i.curso_id
+WHERE i.palabra IN (SELECT term FROM Q)
+GROUP BY c.url
+ORDER BY score_bin DESC, c.url
+LIMIT 10;
